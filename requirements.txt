@@ -1,0 +1,7 @@
+mcp
+langchain
+langchain-mcp-adapters
+langchain-huggingface
+huggingface_hub
+python-pptx  
+requests
