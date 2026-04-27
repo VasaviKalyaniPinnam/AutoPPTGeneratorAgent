@@ -27,14 +27,14 @@ The agent follows this sequence every time:
 
 ## 📁 Project Structure
 
-auto_ppt_agent/
-agent/auto_ppt_agent.py — main agent loop
-mcp_servers/ppt_server.py — MCP tools for PPT creation
-mcp_servers/search_server.py — MCP tool for web search
-app.py — Streamlit interface
-config.py — model and file settings
-run_agent.py — CLI entry point
-requirements.txt
+auto_ppt_agent/<br>
+agent/auto_ppt_agent.py — main agent loop<br>
+mcp_servers/ppt_server.py — MCP tools for PPT creation<br>
+mcp_servers/search_server.py — MCP tool for web search<br>
+app.py — Streamlit interface<br>
+config.py — model and file settings<br>
+run_agent.py — CLI entry point<br>
+requirements.txt<br>
 reflection.md
 
 ## ⚙️ Setup and Installation
