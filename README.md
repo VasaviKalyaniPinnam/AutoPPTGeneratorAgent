@@ -8,7 +8,7 @@ Built using LangChain, Groq LLM, and MCP (Model Context Protocol).
 ## 📽️ Demo
 
 Enter a prompt like:
-"Create a 5-slide presentation on the life cycle of a star for a 6th-grade class"
+"Create a 5-slide presentation about Machine Learning"
 
 The agent plans, searches, writes, and saves a .pptx file — all by itself.
 
@@ -28,42 +28,38 @@ The agent follows this sequence every time:
 ## 📁 Project Structure
 
 auto_ppt_agent/
-- agent/auto_ppt_agent.py — main agent loop
-- mcp_servers/ppt_server.py — MCP tools for PPT creation
-- mcp_servers/search_server.py — MCP tool for web search
-- config.py — model and file settings
-- run_agent.py — entry point
-- requirements.txt
-- reflection.md
-
+│
+├── agent/
+│   └── auto_ppt_agent.py      # Agent logic (LangChain + tools)
+│
+├── mcp_servers/
+│   ├── ppt_server.py          # PPT generation tools
+│   └── search_server.py       # Web search tool
+│
+├── app.py                     # Streamlit frontend
+├── run_agent.py               # CLI entry point
+├── config.py                  # API keys & settings
+├── requirements.txt
+└── reflection.md
 
 ## ⚙️ Setup and Installation
 
-Step 1 — Clone the repository
+Clone the repository and move into the project folder.
 
-git clone https://github.com/VasaviKalyaniPinnam/AutoPPTAgent.git
-cd AutoPPTAgent
+Install all required dependencies using the requirements file.
 
-Step 2 — Install dependencies
+Get your API keys:
 
-pip install -r requirements.txt
+Groq API key from https://console.groq.com
+Pexels API key from https://www.pexels.com/api
 
-Step 3 — Add your Groq API key
+Open the config.py file and replace the placeholder values with your API keys.
 
-Get a free key at https://console.groq.com, then open config.py and replace the placeholder with your key.
+To run the application using the web interface, start the Streamlit app. This provides a simple UI where you can enter your prompt and generate presentations interactively.
 
-Step 4 — Run the agent
+Alternatively, you can run the agent directly from the terminal, which will prompt you to enter a topic and generate the presentation.
 
-python run_agent.py
-
-Step 5 — Enter your prompt
-
-Enter topic: Create a 5-slide presentation on the solar system for 6th graders
-
-Step 6 — Open the output
-
-start output.pptx
-
+Once the process completes, the generated PowerPoint file will be saved in the project directory. Open the file to view your presentation.
 
 ## 🛠️ MCP Tools
 
@@ -83,17 +79,20 @@ Opens at http://localhost:5173 — click Connect, go to the Tools tab, and run e
 
 
 ## 📦 Tech Stack
-
-- LLM — Groq (llama-3.3-70b-versatile)
-- Agent Framework — LangChain
-- Tool Protocol — MCP (Model Context Protocol)
-- PPT Generation — python-pptx
-- Web Search — Wikipedia REST API
+  -LLM — Groq (llama-3.3-70b-versatile)
+  -Agent Framework — LangChain  
+  -Protocol — MCP (Model Context Protocol)
+  -Frontend — Streamlit
+  -PPT Generation — python-pptx
+  -Images — Pexels API
+  -Search — Wikipedia REST API
 
 
 ## 💡 Example Prompts
 
-- Create a 5-slide presentation on black holes for high school students
-- Create a presentation on the history of the internet
-- Make a presentation about climate change for college students
-- Create slides on photosynthesis for 8th graders
+    "Deep Learning vs Machine Learning",
+    "Blockchain Technology and Its Applications",
+    "Cloud Computing Architecture",
+    "Cybersecurity Threats and Prevention",
+    "Operating System Concepts",
+    "Evolution of Artificial Intelligence"
