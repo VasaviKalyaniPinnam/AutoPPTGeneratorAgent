@@ -1,7 +1,7 @@
 import asyncio
 import json
 from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from config import Config
 
@@ -10,133 +10,175 @@ def get_llm():
     return ChatGroq(
         model=Config.MODEL_ID,
         api_key=Config.GROQ_API_KEY,
-        temperature=0,
+        temperature=0.5,  # increased for richer content
     )
 
 
+async def generate_content(llm, topic: str) -> dict:
+    """Ask LLM to generate all slide content as JSON."""
+    messages = [
+        SystemMessage(content=(
+            "You are a presentation content generator. "
+            "Each bullet point must be detailed and contain 10-15 words. "
+            "Do not generate short phrases. Avoid one-word or two-word points. "
+            "Return ONLY valid JSON. No explanation. No markdown. No code blocks. "
+            "Just raw JSON."
+        )),
+        HumanMessage(content=(
+            f"Generate content for a 5-slide presentation about: {topic}\n\n"
+            "Return this exact JSON structure:\n"
+            "{\n"
+            '  "title": "Main presentation title",\n'
+            '  "subtitle": "One line subtitle",\n'
+            '  "slides": [\n'
+            '    {\n'
+            '      "title": "Slide 2 title",\n'
+            '      "bullet_points": [\n'
+            '        "Detailed explanation of the concept with context and meaning (10-15 words)",\n'
+            '        "Another meaningful point explaining importance or working clearly (10-15 words)",\n'
+            '        "Explanation including example or real-world application (10-15 words)",\n'
+            '        "Insight about benefits, impact, or significance (10-15 words)",\n'
+            '        "Additional supporting detail to make slide content richer (10-15 words)"\n'
+            '      ],\n'
+            '      "image_query": "specific search term for image"\n'
+            '    },\n'
+            '    {\n'
+            '      "title": "Slide 3 title",\n'
+            '      "bullet_points": [\n'
+            '        "Detailed explanation of the concept with context and meaning (10-15 words)",\n'
+            '        "Another meaningful point explaining importance or working clearly (10-15 words)",\n'
+            '        "Explanation including example or real-world application (10-15 words)",\n'
+            '        "Insight about benefits, impact, or significance (10-15 words)",\n'
+            '        "Additional supporting detail to make slide content richer (10-15 words)"\n'
+            '      ],\n'
+            '      "image_query": "specific search term for image"\n'
+            '    },\n'
+            '    {\n'
+            '      "title": "Slide 4 title",\n'
+            '      "bullet_points": [\n'
+            '        "Detailed explanation of the concept with context and meaning (10-15 words)",\n'
+            '        "Another meaningful point explaining importance or working clearly (10-15 words)",\n'
+            '        "Explanation including example or real-world application (10-15 words)",\n'
+            '        "Insight about benefits, impact, or significance (10-15 words)",\n'
+            '        "Additional supporting detail to make slide content richer (10-15 words)"\n'
+            '      ],\n'
+            '      "image_query": "specific search term for image"\n'
+            '    }\n'
+            '  ],\n'
+            '  "summary": "One sentence conclusion summary",\n'
+            '  "takeaways": ["takeaway 1", "takeaway 2", "takeaway 3"]\n'
+            "}"
+        ))
+    ]
+
+    response = await llm.ainvoke(messages)
+    raw = response.content.strip()
+
+    # Clean markdown if present
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+
+    raw = raw.strip()
+    return json.loads(raw)
+
+
 async def run_agent(user_prompt: str):
-    # Handle vague prompts
+
     if len(user_prompt.strip()) < 5:
         user_prompt = "Create a general informative presentation"
-        print(f"  Vague prompt detected. Using default: '{user_prompt}'")
+        print(f"⚠️ Vague prompt detected. Using default: '{user_prompt}'")
 
     print(f"\n Starting AutoPPT Agent for topic: '{user_prompt}'\n")
 
+    client = MultiServerMCPClient({
+        "ppt_server": {
+            "command": "python",
+            "args": ["mcp_servers/ppt_server.py"],
+            "transport": "stdio"
+        },
+        "search_server": {
+            "command": "python",
+            "args": ["mcp_servers/search_server.py"],
+            "transport": "stdio"
+        }
+    })
+
+    tools = await client.get_tools()
+    print(f" Loaded {len(tools)} tools: {[t.name for t in tools]}\n")
+
+    tool_map = {t.name: t for t in tools}
+    llm = get_llm()
+
+    # Step 1 — Generate content
+    print(" Generating slide content...\n")
     try:
-        client = MultiServerMCPClient({
-            "ppt_server": {
-                "command": "python",
-                "args": ["mcp_servers/ppt_server.py"],
-                "transport": "stdio"
-            },
-            "search_server": {
-                "command": "python",
-                "args": ["mcp_servers/search_server.py"],
-                "transport": "stdio"
-            }
-        })
-
-        tools = await client.get_tools()
-        print(f" Loaded {len(tools)} tools: {[t.name for t in tools]}\n")
-
-        llm = get_llm()
-        llm_with_tools = llm.bind_tools(tools, tool_choice="any")
-        tool_map = {t.name: t for t in tools}
-
-        messages = [
-            SystemMessage(content=(
-                "You are a PowerPoint presentation agent. You MUST follow these steps in order:\n\n"
-                "STEP 1 - PLAN: Call plan_slides with the topic to outline the presentation.\n"
-                "STEP 2 - SEARCH: Call search_web to get real information about the topic.\n"
-                "STEP 3 - CREATE: Call create_presentation with filename='" + Config.OUTPUT_FILE + "'.\n"
-                "STEP 4 - WRITE: Call add_slide 5 times, one per slide, using info from search results.\n"
-                "STEP 5 - SAVE: Call save_presentation with filename='" + Config.OUTPUT_FILE + "'.\n\n"
-                "Rules:\n"
-                "- Never skip the planning step.\n"
-                "- Always call tools. Never just describe what you would do.\n"
-                "- If search fails, use your own knowledge — never crash.\n"
-                "- Each slide must have a clear title and 3-5 bullet points.\n"
-            )),
-            HumanMessage(content=(
-                f"Create a 5-slide PowerPoint presentation about: {user_prompt}\n\n"
-                f"Output filename: {Config.OUTPUT_FILE}\n\n"
-                "Begin with STEP 1: call plan_slides now."
-            ))
-        ]
-
-        max_iterations = 30
-        save_done = False
-
-        for iteration in range(1, max_iterations + 1):
-            print(f" Iteration {iteration}...")
-
-            try:
-                response = await llm_with_tools.ainvoke(messages)
-            except Exception as llm_error:
-                print(f" LLM error: {llm_error}")
-                print(" Retrying with simplified message...")
-                messages.append(HumanMessage(content="Continue from where you left off. Call the next tool."))
-                continue
-
-            messages.append(response)
-
-            if not response.tool_calls:
-                print("\n Agent finished.\n")
-                print("Final message:", response.content)
-                break
-
-            for tool_call in response.tool_calls:
-                tool_name = tool_call["name"]
-                tool_args = tool_call["args"]
-                tool_id   = tool_call["id"]
-
-                print(f"   Calling: {tool_name}({json.dumps(tool_args)})")
-
-                try:
-                    if tool_name in tool_map:
-                        result = await tool_map[tool_name].ainvoke(tool_args)
-                    else:
-                        result = f"Tool '{tool_name}' not found. Available tools: {list(tool_map.keys())}"
-                except Exception as tool_error:
-                    result = f"Tool error: {tool_error}. Continue with next step."
-
-                print(f"    Result: {result}\n")
-
-                messages.append(ToolMessage(
-                    content=str(result),
-                    tool_call_id=tool_id
-                ))
-
-                if tool_name == "save_presentation":
-                    save_done = True
-                    llm_with_tools = llm.bind_tools(tools)  # remove forced tool_choice
-
-            if save_done:
-                response = await llm_with_tools.ainvoke(messages)
-                print("\n Done! Final message:", response.content)
-                break
-
-        else:
-            print(" Max iterations reached. Attempting emergency save...")
-            try:
-                result = await tool_map["save_presentation"].ainvoke({"filename": Config.OUTPUT_FILE})
-                print(f"  ✔  Emergency save result: {result}")
-            except Exception as e:
-                print(f" Emergency save failed: {e}")
-
+        content = await generate_content(llm, user_prompt)
+        print(f" Content generated:\n{json.dumps(content, indent=2)}\n")
     except Exception as e:
-        print(f"\n Agent crashed: {e}")
-        print("Creating fallback presentation...")
-        try:
-            from pptx import Presentation as PPTPresentation
-            prs = PPTPresentation()
-            slide_layout = prs.slide_layouts[1]
-            slide = prs.slides.add_slide(slide_layout)
-            slide.shapes.title.text = user_prompt
-            slide.placeholders[1].text_frame.paragraphs[0].text = "Content generation failed. Please try again."
-            prs.save(Config.OUTPUT_FILE)
-            print(f" Fallback presentation saved as '{Config.OUTPUT_FILE}'")
-        except Exception as fallback_error:
-            print(f" Fallback also failed: {fallback_error}")
+        print(f"Content generation failed: {e}")
+        raise
 
-    print(f"\n Presentation saved as '{Config.OUTPUT_FILE}'\n")
+    filename = Config.OUTPUT_FILE
+
+    # Step 2 — plan_slides
+    print(" Step 1: plan_slides")
+    result = await tool_map["plan_slides"].ainvoke({
+        "topic": user_prompt,
+        "num_slides": 5
+    })
+    print(f" {result}\n")
+
+    # Step 3 — search_web
+    print("🔧 Step 2: search_web")
+    result = await tool_map["search_web"].ainvoke({
+        "query": user_prompt
+    })
+    print(f" {result[:100]}...\n")
+
+    # Step 4 — create_presentation
+    print(" Step 3: create_presentation")
+    result = await tool_map["create_presentation"].ainvoke({
+        "filename": filename
+    })
+    print(f"{result}\n")
+
+    # Step 5 — add_intro_slide
+    print(" Step 4: add_intro_slide")
+    result = await tool_map["add_intro_slide"].ainvoke({
+        "filename": filename,
+        "title": content["title"],
+        "subtitle": content["subtitle"]
+    })
+    print(f" {result}\n")
+
+    # Step 6 — add_content_slide
+    for i, slide in enumerate(content["slides"], start=2):
+        print(f" Step {i + 3}: add_content_slide (Slide {i})")
+        result = await tool_map["add_content_slide"].ainvoke({
+            "filename": filename,
+            "title": slide["title"],
+            "bullet_points": slide["bullet_points"],
+            "image_query": slide["image_query"]
+        })
+        print(f" {result}\n")
+
+    # Step 7 — add_conclusion_slide
+    print(" Step 8: add_conclusion_slide")
+    result = await tool_map["add_conclusion_slide"].ainvoke({
+        "filename": filename,
+        "summary": content["summary"],
+        "takeaways": content["takeaways"]
+    })
+    print(f" {result}\n")
+
+    # Step 8 — save_presentation
+    print(" Step 9: save_presentation")
+    result = await tool_map["save_presentation"].ainvoke({
+        "filename": filename
+    })
+    print(f" {result}\n")
+
+    print(" All slides generated and saved!")
+    print(f"\n Done! Open '{Config.OUTPUT_FILE}' to view your presentation.\n")
