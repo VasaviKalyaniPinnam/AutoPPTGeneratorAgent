@@ -74,13 +74,13 @@ Opens at http://localhost:5173 — click Connect, go to the Tools tab, and run e
 
 
 ## 📦 Tech Stack
-  -LLM — Groq (llama-3.3-70b-versatile)
-  -Agent Framework — LangChain  
-  -Protocol — MCP (Model Context Protocol)
-  -Frontend — Streamlit
-  -PPT Generation — python-pptx
-  -Images — Pexels API
-  -Search — Wikipedia REST API
+  -LLM — Groq (llama-3.3-70b-versatile)<br>
+  -Agent Framework — LangChain  <br>
+  -Protocol — MCP (Model Context Protocol)<br>
+  -Frontend — Streamlit<br>
+  -PPT Generation — python-pptx<br>
+  -Images — Pexels API<br>
+  -Search — Wikipedia REST API<br>
 
 
 ## 💡 Example Prompts
